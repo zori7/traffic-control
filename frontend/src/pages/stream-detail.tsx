@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Trash2, TriangleAlert, Waypoints } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import {
+  ArrowLeft,
+  Pencil,
+  Play,
+  Square,
+  Trash2,
+  TriangleAlert,
+  Waypoints,
+} from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -8,13 +16,28 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { deleteLine, deleteStream, fetchLines, fetchStream } from '@/features/streams/api'
+import {
+  deleteLine,
+  deleteStream,
+  fetchCounts,
+  fetchLines,
+  fetchPlayback,
+  fetchStatus,
+  fetchStream,
+  startStream,
+  stopStream,
+} from '@/features/streams/api'
 import { ConfirmDialog } from '@/features/streams/confirm-dialog'
 import { HlsPlayer, type Resolution } from '@/features/streams/hls-player'
+import { OverlayEditor } from '@/features/streams/overlay-editor'
 import { StatusBadge } from '@/features/streams/status-badge'
 import { StreamFormDialog } from '@/features/streams/stream-form-dialog'
+import type { Counters, StreamStatus, WorkerStatus } from '@/features/streams/types'
 import { ApiError } from '@/lib/api'
 import { formatRelativeTime, sourceHost } from '@/lib/format'
+import { cn } from '@/lib/utils'
+
+const ACTIVE_STATES = new Set(['starting', 'running', 'stopping'])
 
 export function StreamDetailPage() {
   const params = useParams()
@@ -25,7 +48,9 @@ export function StreamDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
   const [resolution, setResolution] = useState<Resolution | null>(null)
+  const [view, setView] = useState<'source' | 'annotated'>('source')
 
   const streamQuery = useQuery({
     queryKey: ['streams', streamId],
@@ -36,6 +61,27 @@ export function StreamDetailPage() {
     queryKey: ['streams', streamId, 'lines'],
     queryFn: () => fetchLines(streamId),
     enabled: validId,
+  })
+  const statusQuery = useQuery({
+    queryKey: ['streams', streamId, 'status'],
+    queryFn: () => fetchStatus(streamId),
+    enabled: validId,
+    refetchInterval: (query) => {
+      const state = query.state.data?.state
+      return state && ACTIVE_STATES.has(state) ? 1500 : 4000
+    },
+  })
+  const playbackQuery = useQuery({
+    queryKey: ['streams', streamId, 'playback'],
+    queryFn: () => fetchPlayback(streamId),
+    enabled: validId,
+    staleTime: 5 * 60 * 1000,
+  })
+  const countsQuery = useQuery({
+    queryKey: ['streams', streamId, 'counts'],
+    queryFn: () => fetchCounts(streamId),
+    enabled: validId,
+    refetchInterval: (query) => (query.state.data?.total ? 3000 : 5000),
   })
 
   const deleteMutation = useMutation({
@@ -62,6 +108,42 @@ export function StreamDetailPage() {
       toast.error(error instanceof ApiError ? error.message : 'Could not remove the line')
     },
   })
+
+  const startMutation = useMutation({
+    mutationFn: () => startStream(streamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams', streamId, 'status'] })
+      queryClient.invalidateQueries({ queryKey: ['streams', streamId, 'playback'] })
+      queryClient.invalidateQueries({ queryKey: ['streams', streamId] })
+      queryClient.invalidateQueries({ queryKey: ['streams'] })
+      toast.success('Counting started')
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not start counting'),
+  })
+
+  const stopMutation = useMutation({
+    mutationFn: () => stopStream(streamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams', streamId, 'status'] })
+      queryClient.invalidateQueries({ queryKey: ['streams', streamId, 'counts'] })
+      queryClient.invalidateQueries({ queryKey: ['streams', streamId] })
+      queryClient.invalidateQueries({ queryKey: ['streams'] })
+      toast.success('Counting stopped')
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not stop counting'),
+  })
+
+  // The view follows the worker: annotated once its HLS output exists, source
+  // otherwise. A manual toggle while running sticks until the state changes.
+  const liveState = statusQuery.data?.state ?? streamQuery.data?.status ?? 'idle'
+  const hlsReady = statusQuery.data?.hls_ready ?? false
+  const autoView: 'source' | 'annotated' =
+    liveState === 'running' && hlsReady ? 'annotated' : 'source'
+  useEffect(() => {
+    setView(autoView)
+  }, [autoView])
 
   if (streamQuery.isLoading) return <DetailSkeleton />
 
@@ -92,6 +174,16 @@ export function StreamDetailPage() {
   }
 
   const lines = linesQuery.data ?? []
+  const status: WorkerStatus | undefined = statusQuery.data
+  const state = liveState
+  const badgeState: StreamStatus = state === 'stopped' ? 'idle' : state
+  const isActive = ACTIVE_STATES.has(state)
+  const canToggleView = state === 'running'
+  const counters: Counters | undefined = isActive ? status?.counters : countsQuery.data
+  const playerSrc =
+    isActive && hlsReady && view === 'annotated' && playbackQuery.data
+      ? playbackQuery.data.manifest_url
+      : stream.source_url
 
   return (
     <div className="container py-10">
@@ -107,7 +199,7 @@ export function StreamDetailPage() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="truncate font-display text-4xl font-light text-ink">{stream.name}</h1>
-            <StatusBadge status={stream.status} />
+            <StatusBadge status={badgeState} />
             <Badge variant="outline">{stream.source_kind.toUpperCase()}</Badge>
           </div>
           {stream.description ? (
@@ -119,6 +211,21 @@ export function StreamDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {isActive ? (
+            <Button
+              variant="outline"
+              onClick={() => stopMutation.mutate()}
+              disabled={stopMutation.isPending}
+            >
+              <Square className="h-4 w-4" />
+              Stop counting
+            </Button>
+          ) : (
+            <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
+              <Play className="h-4 w-4" />
+              Start counting
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" />
             Edit
@@ -130,18 +237,63 @@ export function StreamDetailPage() {
         </div>
       </div>
 
+      {state === 'error' && status?.last_error && (
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-hairline bg-surface px-4 py-3 text-sm">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-error" />
+          <p className="text-body">{status.last_error}</p>
+        </div>
+      )}
+
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card className="overflow-hidden">
             <CardHeader className="flex-row items-start justify-between gap-4">
               <div>
-                <CardTitle>Live source</CardTitle>
-                <CardDescription>The raw feed as received from the camera.</CardDescription>
+                <CardTitle>Video</CardTitle>
+                <CardDescription>
+                  {isActive && !hlsReady
+                    ? 'Preparing the annotated output…'
+                    : view === 'annotated'
+                      ? 'The processed feed with boxes, lanes and counters.'
+                      : 'The raw feed as received from the camera.'}
+                </CardDescription>
               </div>
+              {isActive && (
+                <div className="flex items-center gap-1.5">
+                  <ViewToggle
+                    active={view === 'source'}
+                    onClick={() => setView('source')}
+                    disabled={!canToggleView}
+                    title={!canToggleView ? 'Available while counting is running' : undefined}
+                  >
+                    Source
+                  </ViewToggle>
+                  <ViewToggle
+                    active={view === 'annotated'}
+                    onClick={() => setView('annotated')}
+                    disabled={!canToggleView || !playbackQuery.data || !hlsReady}
+                    title={
+                      !canToggleView
+                        ? 'Available while counting is running'
+                        : !hlsReady
+                          ? 'Preparing annotated output…'
+                          : undefined
+                    }
+                  >
+                    Annotated
+                  </ViewToggle>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="pt-0">
-              <HlsPlayer src={stream.source_url} onResolution={setResolution} />
-              <p className="mt-3 truncate text-xs text-muted">{stream.source_url}</p>
+              <HlsPlayer
+                key={playerSrc}
+                src={playerSrc}
+                onResolution={view === 'source' ? setResolution : undefined}
+              />
+              <p className="mt-3 truncate text-xs text-muted">
+                {view === 'annotated' ? 'Annotated HLS output' : stream.source_url}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -150,18 +302,68 @@ export function StreamDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Status</CardTitle>
-              <CardDescription>Worker telemetry appears once counting starts.</CardDescription>
+              <CardDescription>
+                {isActive ? 'Live worker telemetry.' : 'Start counting to see worker telemetry.'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
               <StatusRow label="State">
-                <StatusBadge status={stream.status} />
+                <StatusBadge status={badgeState} />
               </StatusRow>
               <StatusRow label="Resolution">
-                {resolution ? `${resolution.width} × ${resolution.height}` : '—'}
+                {status?.width
+                  ? `${status.width} × ${status.height}`
+                  : resolution
+                    ? `${resolution.width} × ${resolution.height}`
+                    : '—'}
               </StatusRow>
-              <StatusRow label="Frame rate">—</StatusRow>
-              <StatusRow label="Frames processed">—</StatusRow>
-              <StatusRow label="Latency">—</StatusRow>
+              <StatusRow label="Frame rate">
+                {status && status.fps > 0 ? `${status.fps.toFixed(1)} fps` : '—'}
+              </StatusRow>
+              <StatusRow label="Frames processed">
+                {status && status.frames > 0 ? status.frames.toLocaleString() : '—'}
+              </StatusRow>
+              <StatusRow label="Processing">
+                {status && status.latency_ms > 0 ? `${status.latency_ms.toFixed(0)} ms` : '—'}
+              </StatusRow>
+              <StatusRow label="Dropped">
+                {status ? status.drop_count.toLocaleString() : '—'}
+              </StatusRow>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Counters</CardTitle>
+              <CardDescription>
+                {isActive ? 'Live entries by line.' : 'Totals from the latest session.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              {!counters || counters.lines.length === 0 ? (
+                <p className="text-sm text-muted">No counts yet.</p>
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-muted">Total</span>
+                    <span className="font-display text-3xl font-light text-ink">
+                      {counters.total.toLocaleString()}
+                    </span>
+                  </div>
+                  <ul className="space-y-2 border-t border-hairline pt-3">
+                    {counters.lines.map((line) => (
+                      <li key={line.line_id} className="flex items-center gap-3 text-sm">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: line.color }}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-body">{line.name}</span>
+                        <span className="font-medium text-ink">{line.total.toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -187,11 +389,7 @@ export function StreamDetailPage() {
               point; the arrow shows the travel direction.
             </p>
           </div>
-          <Button
-            variant="outline"
-            disabled
-            title="Line drawing arrives with the counting engine"
-          >
+          <Button variant="outline" onClick={() => setEditorOpen(true)}>
             <Waypoints className="h-4 w-4" />
             Draw line
           </Button>
@@ -207,7 +405,7 @@ export function StreamDetailPage() {
             <div className="rounded-2xl border border-dashed border-hairline-strong bg-canvas-soft px-6 py-12 text-center">
               <p className="font-sans text-sm font-medium text-ink">No lines yet</p>
               <p className="mx-auto mt-1.5 max-w-md text-sm text-muted">
-                Lines drawn on the video will be listed here with their class filters.
+                Draw a line along a lane on the video, then start counting.
               </p>
             </div>
           ) : (
@@ -229,6 +427,9 @@ export function StreamDetailPage() {
                       {line.points.length} points · {line.classes.join(', ')}
                     </p>
                   </div>
+                  <Button variant="outline" size="sm" onClick={() => setEditorOpen(true)}>
+                    Edit
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -247,6 +448,14 @@ export function StreamDetailPage() {
 
       <StreamFormDialog open={editOpen} onOpenChange={setEditOpen} stream={stream} />
 
+      <OverlayEditor
+        streamId={streamId}
+        lines={lines}
+        roi={stream.roi}
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+      />
+
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -256,6 +465,35 @@ export function StreamDetailPage() {
         isPending={deleteMutation.isPending}
       />
     </div>
+  )
+}
+
+function ViewToggle({
+  active,
+  onClick,
+  disabled,
+  title,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  disabled?: boolean
+  title?: string
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        'rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40',
+        active ? 'bg-surface-strong text-ink' : 'text-muted hover:text-ink',
+      )}
+    >
+      {children}
+    </button>
   )
 }
 

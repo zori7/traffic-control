@@ -9,7 +9,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 
 from app.core.config import settings
 
-TokenType = Literal["access", "refresh"]
+TokenType = Literal["access", "refresh", "media"]
 
 _password_hasher = PasswordHasher()
 
@@ -53,6 +53,15 @@ def create_refresh_token(subject: str | int) -> str:
         subject,
         "refresh",
         timedelta(days=settings.refresh_token_expire_days),
+    )
+
+
+def create_media_token(subject: str | int) -> str:
+    """A short-lived token that authorises reading one stream's media files."""
+    return _create_token(
+        subject,
+        "media",
+        timedelta(minutes=settings.media_token_expire_minutes),
     )
 
 

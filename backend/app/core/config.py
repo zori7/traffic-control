@@ -1,6 +1,7 @@
 """Application configuration loaded from environment / .env."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -36,6 +37,23 @@ class Settings(BaseSettings):
     # CORS (comma-separated list)
     cors_origins: str = "http://localhost:5173"
 
+    # Counting engine
+    media_dir: str = "media"
+    max_concurrent_streams: int = 2
+    yolo_model: str = "yolo11n.pt"
+    yolo_imgsz: int = 768
+    yolo_conf: float = 0.1
+    yolo_iou: float = 0.5
+    yolo_device: str = "cpu"
+    decode_max_width: int = 1280
+    corridor_fraction: float = 0.06
+    video_codec: str = "libx264"
+    output_fps: int = 12
+    hls_segment_seconds: int = 2
+    hls_list_size: int = 6
+    count_flush_seconds: float = 5.0
+    media_token_expire_minutes: int = 360
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -43,6 +61,13 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod"}
+
+    @property
+    def media_path(self) -> Path:
+        path = Path(self.media_dir)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        return path
 
 
 @lru_cache

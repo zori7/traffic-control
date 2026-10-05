@@ -59,19 +59,34 @@ export function HlsPlayer({
     let hls: Hls | null = null
     let networkRetries = 0
     let mediaRetries = 0
+    let retryTimer: number | null = null
+    const MAX_NETWORK_RETRIES = 8
 
     if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 30 })
       hls.loadSource(src)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        networkRetries = 0
         void video.play().catch(() => undefined)
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries < 1) {
+        // The annotated playlist can briefly 404 (or be half-written) while the
+        // worker emits its first segment, or during a network blip. Retry with
+        // backoff instead of surfacing a fatal error and getting stuck.
+        const retryableManifest =
+          data.type === Hls.ErrorTypes.NETWORK_ERROR ||
+          data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR
+        if (retryableManifest && networkRetries < MAX_NETWORK_RETRIES) {
           networkRetries += 1
-          hls?.startLoad()
+          setState('connecting')
+          const delay = Math.min(500 * networkRetries, 3000)
+          if (retryTimer !== null) window.clearTimeout(retryTimer)
+          retryTimer = window.setTimeout(() => {
+            retryTimer = null
+            hls?.startLoad()
+          }, delay)
           return
         }
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRetries < 1) {
@@ -94,6 +109,7 @@ export function HlsPlayer({
       video.removeEventListener('playing', handlePlaying)
       video.removeEventListener('error', handleVideoError)
       video.removeEventListener('loadedmetadata', handleMetadata)
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
       hls?.destroy()
     }
   }, [src])

@@ -22,6 +22,10 @@ npm-debug.log*
 # Generated media (HLS segments, snapshots)
 media/
 
+# Model weights (downloaded on first run)
+*.pt
+*.onnx
+
 # Editors / OS
 .DS_Store
 .idea/
