@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light — off-white canvas, warm near-black ink */
+    --canvas: #f5f5f5;
+    --canvas-soft: #fafafa;
+    --surface: #ffffff;
+    --surface-strong: #f0efed;
+    --ink: #0c0a09;
+    --body: #4e4e4e;
+    --body-strong: #292524;
+    --muted: #777169;
+    --muted-soft: #a8a29e;
+    --hairline: #e7e5e4;
+    --hairline-soft: #f0efed;
+    --hairline-strong: #d6d3d1;
+    --primary: #292524;
+    --primary-active: #0c0a09;
+    --on-primary: #ffffff;
+    --success: #16a34a;
+    --error: #dc2626;
+    --ring: #292524;
+    color-scheme: light;
+  }
+
+  .dark {
+    /* Dark — deep warm canvas, light ink action */
+    --canvas: #0c0a09;
+    --canvas-soft: #141110;
+    --surface: #1c1917;
+    --surface-strong: #292524;
+    --ink: #fafaf9;
+    --body: #d6d3d1;
+    --body-strong: #e7e5e4;
+    --muted: #a8a29e;
+    --muted-soft: #777169;
+    --hairline: #292524;
+    --hairline-soft: #1c1917;
+    --hairline-strong: #44403c;
+    --primary: #fafaf9;
+    --primary-active: #ffffff;
+    --on-primary: #0c0a09;
+    --success: #22c55e;
+    --error: #f87171;
+    --ring: #a8a29e;
+    color-scheme: dark;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--hairline);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas text-body font-sans antialiased;
+    letter-spacing: 0.16px;
+    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-ink;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-canvas;
+  }
+}
+
+@layer utilities {
+  .display {
+    @apply font-display font-light text-ink;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Atmospheric gradient orb — decoration only, never a surface. */
+  .orb {
+    @apply pointer-events-none absolute rounded-full blur-3xl;
+    opacity: 0.55;
+  }
+}
+
+/* Traffic visualization motion (landing hero). */
+@keyframes tc-drive-right {
+  from {
+    left: -16%;
+  }
+  to {
+    left: 116%;
+  }
+}
+
+@keyframes tc-drive-left {
+  from {
+    left: 116%;
+  }
+  to {
+    left: -16%;
+  }
+}
+
+@keyframes tc-flash {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+  }
+  35% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

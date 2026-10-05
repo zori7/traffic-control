@@ -1,0 +1,30 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+backend/.env
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Generated media (HLS segments, snapshots)
+media/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+DESIGN.md

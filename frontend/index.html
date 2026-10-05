@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" suppressHydrationWarning>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Traffic Control — count vehicles from any video stream by drawing directional lines. Live counters, per-class breakdowns, and stream health in one place."
+    />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f5" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0a09" />
+    <title>Traffic Control</title>
+    <script>
+      // Apply the persisted theme before first paint to avoid a flash.
+      try {
+        var stored = localStorage.getItem('theme')
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        var dark = stored === 'dark' || ((stored === 'system' || !stored) && prefersDark)
+        document.documentElement.classList.toggle('dark', dark)
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
