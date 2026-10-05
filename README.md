@@ -1,19 +1,19 @@
 # Traffic Control
 
-AI-powered traffic counting from video streams. Draw a one or more directional
-lines over a live feed and Traffic Control counts the vehicles that cross them —
-in real time, split by direction and by class.
+AI-powered traffic counting from video streams. Draw one or more directional
+lane lines over a live feed and Traffic Control counts the vehicles that enter
+each line from its entry end — in real time, split by class.
 
-> **Status:** Milestone 1 complete — foundation, design system, and authentication.
-> See [Roadmap](#roadmap).
+> **Status:** Milestones 1–2 complete — foundation, design system, authentication,
+> and stream management with live source preview. See [Roadmap](#roadmap).
 
 ## Stack
 
 | Layer | Technology |
 |---|---|
 | Backend | FastAPI, async SQLAlchemy 2 + asyncpg, Alembic, PostgreSQL, JWT in HttpOnly cookies (Argon2) |
-| Frontend | React 19 + Vite, TypeScript, Tailwind, shadcn-style UI, Framer Motion, TanStack Query, React Router |
-| Planned | Ultralytics YOLO11 + ByteTrack, supervision, ffmpeg (HLS in/out), python-socketio, hls.js, react-konva |
+| Frontend | React 19 + Vite, TypeScript, Tailwind, shadcn-style UI, Framer Motion, TanStack Query, React Router, hls.js |
+| Planned | Ultralytics YOLO11 + ByteTrack, supervision, ffmpeg (HLS in/out), python-socketio, react-konva |
 
 ## Repository layout
 
@@ -32,10 +32,11 @@ in real time, split by direction and by class.
 │   └── pyproject.toml     # ruff + pytest config
 ├── frontend/
 │   └── src/
-│       ├── components/    # ui primitives, layout, theme, landing
-│       ├── features/auth/ # auth API, context, route guards
-│       ├── lib/           # api client, query client, utils
-│       └── pages/         # landing, login, register, streams, not-found
+│       ├── components/      # ui primitives, layout, theme, landing
+│       ├── features/auth/   # auth API, context, route guards
+│       ├── features/streams/# streams API, HLS player, dialogs, status
+│       ├── lib/             # api client, query client, utils
+│       └── pages/           # landing, login, register, streams, stream detail, not-found
 ├── docker-compose.yml     # PostgreSQL (api/web added in M5)
 ├── pyrightconfig.json
 └── DESIGN.md              # design tokens
@@ -103,7 +104,7 @@ Backend (`backend/.env`, see `backend/.env.example`):
 Frontend (`frontend/.env`, see `frontend/.env.example`): `VITE_PROXY_TARGET`,
 `VITE_API_BASE_URL`.
 
-## API (Milestone 1)
+## API
 
 | Method | Path | Description |
 |---|---|---|
@@ -114,10 +115,23 @@ Frontend (`frontend/.env`, see `frontend/.env.example`): `VITE_PROXY_TARGET`,
 | POST | `/api/auth/logout` | Clear auth cookies |
 | POST | `/api/auth/refresh` | Rotate access + refresh tokens |
 | GET | `/api/auth/me` | Current user |
+| GET | `/api/streams` | List the current user's streams |
+| POST | `/api/streams` | Connect a new stream |
+| GET | `/api/streams/{id}` | Stream detail |
+| PATCH | `/api/streams/{id}` | Update name, source or config |
+| DELETE | `/api/streams/{id}` | Delete a stream and its lines |
+| PUT | `/api/streams/{id}/roi` | Set the normalized region of interest |
+| GET | `/api/streams/{id}/lines` | List counting lines |
+| POST | `/api/streams/{id}/lines` | Create a counting line (polyline) |
+| PUT | `/api/streams/{id}/lines/reorder` | Reorder lines |
+| PATCH | `/api/lines/{id}` | Update a line |
+| DELETE | `/api/lines/{id}` | Delete a line |
 
 Sessions are carried in HttpOnly cookies — `tc_access` (short-lived, path `/`)
 and `tc_refresh` (path `/api/auth`, rotated on every refresh). Usernames are
-normalized to lowercase and hashed with Argon2.
+normalized to lowercase and hashed with Argon2. Streams are scoped to their
+owner; a line is an ordered polyline of normalized `{x, y}` points whose first
+point is the entry end.
 
 ## Quality gates
 
@@ -143,7 +157,7 @@ Display type uses **Newsreader**; body copy uses **Inter**.
 | Milestone | Scope | Status |
 |---|---|---|
 | **M1 — Foundation, design system, auth** | Scaffolding, design tokens, theming, landing, register/login/logout, JWT cookies | Done |
-| **M2 — Stream CRUD & detail shell** | Stream CRUD, list/detail pages, HLS source preview | Planned |
+| **M2 — Stream CRUD & detail shell** | Stream CRUD, list/detail pages, HLS source preview | Done |
 | **M3 — CV counting engine + overlay** | ffmpeg decode, YOLO11 + ByteTrack, ROI, directional lines, annotated HLS | Planned |
 | **M4 — Realtime counters & status** | Socket.IO live counters, FPS/status panel, animations | Planned |
 | **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | Planned |

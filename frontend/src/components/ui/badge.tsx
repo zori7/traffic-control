@@ -11,6 +11,7 @@ const badgeVariants = cva(
         default: 'bg-surface-strong text-ink',
         outline: 'border border-hairline-strong text-muted',
         success: 'bg-success/10 text-success',
+        error: 'bg-error/10 text-error',
         accent: 'bg-ink text-canvas',
       },
     },

@@ -8,6 +8,7 @@ import { LoginPage } from '@/pages/login'
 import { NotFoundPage } from '@/pages/not-found'
 import { RegisterPage } from '@/pages/register'
 import { StreamsPage } from '@/pages/streams'
+import { StreamDetailPage } from '@/pages/stream-detail'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/streams" element={<StreamsPage />} />
+            <Route path="/streams/:id" element={<StreamDetailPage />} />
           </Route>
         </Route>
 
