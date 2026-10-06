@@ -34,7 +34,7 @@ import { HlsPlayer, type Resolution } from '@/features/streams/hls-player'
 import { OverlayEditor } from '@/features/streams/overlay-editor'
 import { StatusBadge } from '@/features/streams/status-badge'
 import { StreamFormDialog } from '@/features/streams/stream-form-dialog'
-import { useStreamRealtime } from '@/features/streams/use-stream-realtime'
+import { feedKey, useStreamRealtime } from '@/features/streams/use-stream-realtime'
 import type { Counters, StreamStatus, WorkerStatus } from '@/features/streams/types'
 import { ApiError } from '@/lib/api'
 import {
@@ -405,7 +405,7 @@ export function StreamDetailPage() {
                       <ul className="mt-2 space-y-1.5">
                         {feed.slice(0, 5).map((entry) => (
                           <li
-                            key={`${entry.track_id}-${entry.ts}`}
+                            key={feedKey(entry)}
                             className="flex items-center gap-2 text-xs text-body"
                           >
                             <span

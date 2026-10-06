@@ -19,6 +19,14 @@ export interface StreamRealtime {
 }
 
 /**
+ * Stable identity of a crossing. A vehicle can cross several lines in the same
+ * frame, so `track_id` + `ts` alone is not unique — the line is part of it.
+ */
+export function feedKey(entry: LiveEntry): string {
+  return `${entry.line_id}-${entry.track_id}-${entry.ts}`
+}
+
+/**
  * Subscribe to a stream's realtime channel. Status snapshots (including
  * counters) are written straight into the React Query cache, so the page reads
  * live data without polling while connected.
@@ -57,7 +65,12 @@ export function useStreamRealtime(streamId: number, enabled = true): StreamRealt
     }
     const onCount = (entry: LiveEntry) => {
       if (entry.stream_id !== streamId) return
-      setFeed((items) => [entry, ...items].slice(0, MAX_FEED))
+      // Re-subscribing (StrictMode, socket reconnect) can replay recent
+      // crossings, so drop anything already in the feed before prepending.
+      const key = feedKey(entry)
+      setFeed((items) =>
+        [entry, ...items.filter((item) => feedKey(item) !== key)].slice(0, MAX_FEED),
+      )
     }
     const onSubscribeError = (payload: { message?: string }) => {
       console.warn('Realtime subscription rejected:', payload?.message ?? 'unknown error')
