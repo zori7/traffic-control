@@ -75,12 +75,18 @@ export default {
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        'count-pop': {
+          '0%': { transform: 'scale(1)' },
+          '45%': { transform: 'scale(1.6)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'orb-drift': 'orb-drift 14s ease-in-out infinite',
         'orb-drift-alt': 'orb-drift-alt 18s ease-in-out infinite',
         'caret-blink': 'caret-blink 1.1s steps(1, end) infinite',
         shimmer: 'shimmer 1.6s infinite',
+        'count-pop': 'count-pop 0.5s ease-out',
       },
     },
   },

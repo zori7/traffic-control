@@ -4,9 +4,10 @@ AI-powered traffic counting from video streams. Draw one or more directional
 lane lines over a live feed and Traffic Control counts the vehicles that enter
 each line from its entry end — in real time, split by class.
 
-> **Status:** Milestones 1–3 complete — foundation, design system, authentication,
-> stream management, and the CV counting engine with a Konva overlay editor and
-> annotated HLS output. See [Roadmap](#roadmap).
+> **Status:** Milestones 1–4 complete — foundation, design system, authentication,
+> stream management, the CV counting engine with a Konva overlay editor and
+> annotated HLS output, and realtime counters/status over Socket.IO. See
+> [Roadmap](#roadmap).
 
 ## Stack
 
@@ -14,8 +15,8 @@ each line from its entry end — in real time, split by class.
 |---|---|
 | Backend | FastAPI, async SQLAlchemy 2 + asyncpg, Alembic, PostgreSQL, JWT in HttpOnly cookies (Argon2) |
 | Counting | Ultralytics YOLO11-n + ByteTrack (CPU), OpenCV, numpy, ffmpeg (HLS decode → annotate → HLS encode) |
-| Frontend | React 19 + Vite, TypeScript, Tailwind, shadcn-style UI, Framer Motion, TanStack Query, React Router, hls.js, react-konva |
-| Planned | python-socketio (M4) |
+| Realtime | python-socketio + Socket.IO — live status, counters and crossings |
+| Frontend | React 19 + Vite, TypeScript, Tailwind, shadcn-style UI, Framer Motion, TanStack Query, React Router, hls.js, react-konva, socket.io-client |
 
 ## Repository layout
 
@@ -70,7 +71,7 @@ cp backend/.env.example backend/.env
 
 docker compose up -d db
 cd backend && ../.venv/bin/alembic upgrade head
-cd backend && ../.venv/bin/uvicorn app.main:app --reload --port 8000
+cd backend && ../.venv/bin/uvicorn app.main:socket_app --reload --port 8000
 ```
 
 The first run downloads the `yolo11n.pt` weights. Annotated HLS segments are
@@ -95,7 +96,7 @@ If port `8000` is already taken, run the API elsewhere and point the proxy at it
 
 ```bash
 # backend
-cd backend && ../.venv/bin/uvicorn app.main:app --reload --port 8010
+cd backend && ../.venv/bin/uvicorn app.main:socket_app --reload --port 8010
 # frontend
 cd frontend && VITE_PROXY_TARGET=http://127.0.0.1:8010 npm run dev
 ```
@@ -122,6 +123,7 @@ Backend (`backend/.env`, see `backend/.env.example`):
 | `VIDEO_CODEC` | `libx264` | Encoder; falls back to `libopenh264`/`mpeg4` when absent |
 | `HLS_SEGMENT_SECONDS` / `HLS_LIST_SIZE` | `2` / `6` | HLS segment length and playlist depth |
 | `MEDIA_DIR` | `media` | Root for annotated HLS output |
+| `REALTIME_PUSH_SECONDS` | `1.0` | Socket.IO status/counter push interval |
 
 Frontend (`frontend/.env`, see `frontend/.env.example`): `VITE_PROXY_TARGET`,
 `VITE_API_BASE_URL`.
@@ -172,6 +174,25 @@ and re-encodes to low-latency HLS. Annotated media is served through a signed
 per-stream token (`/media/...`) and the counts are flushed to Postgres
 periodically and on stop.
 
+### Realtime (Socket.IO)
+
+`app.main:socket_app` serves the API and a Socket.IO endpoint on the same
+origin (`/socket.io`, proxied by the dev server). Clients authenticate with the
+same HttpOnly access cookie as the REST API and subscribe to the streams they
+own; unauthorised connections and subscriptions are refused.
+
+| Direction | Event | Payload |
+|---|---|---|
+| → server | `subscribe` / `unsubscribe` | `{ stream_id }` |
+| ← client | `subscribed` | `{ stream_id }` |
+| ← client | `status` | full `WorkerStatus` (telemetry + counters); on subscribe and every `REALTIME_PUSH_SECONDS` while active, plus once when a worker stops |
+| ← client | `count` | `{ stream_id, line_id, name, color, class_name, confidence, track_id, ts }` for each line crossing |
+| ← client | `subscribe_error` | `{ stream_id?, message }` |
+
+While the socket is connected the stream detail page stops polling and reads
+the pushed `status` snapshots (plus `count` events for the live crossing feed);
+if the connection drops it falls back to the REST endpoints.
+
 ## Quality gates
 
 ```bash
@@ -198,5 +219,5 @@ Display type uses **Newsreader**; body copy uses **Inter**.
 | **M1 — Foundation, design system, auth** | Scaffolding, design tokens, theming, landing, register/login/logout, JWT cookies | Done |
 | **M2 — Stream CRUD & detail shell** | Stream CRUD, list/detail pages, HLS source preview | Done |
 | **M3 — CV counting engine + overlay** | ffmpeg decode, YOLO11 + ByteTrack, ROI, directional lines, annotated HLS, Konva editor | Done |
-| **M4 — Realtime counters & status** | Socket.IO live counters, FPS/status panel, animations | Planned |
+| **M4 — Realtime counters & status** | Socket.IO live counters, FPS/status panel, animations | Done |
 | **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | Planned |

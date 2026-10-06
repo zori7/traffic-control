@@ -8,6 +8,7 @@ pydantic-settings>=2.3,<3
 argon2-cffi>=23.1,<26
 PyJWT>=2.8,<3
 python-multipart>=0.0.9,<1
+python-socketio>=5.11,<6
 
 # Computer vision / counting engine (CPU). Install PyTorch from the CPU index:
 #   pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision

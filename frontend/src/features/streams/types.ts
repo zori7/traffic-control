@@ -115,6 +115,19 @@ export interface LineEvent {
   ts: string
 }
 
+/** A vehicle crossing pushed over Socket.IO (see `count` events). */
+export interface LiveEntry {
+  stream_id: number
+  line_id: number
+  name: string
+  color: string
+  class_name: string
+  confidence: number | null
+  track_id: number
+  /** Unix timestamp in seconds. */
+  ts: number
+}
+
 export const VEHICLE_CLASSES = [
   { value: 'car', label: 'Car' },
   { value: 'truck', label: 'Truck' },

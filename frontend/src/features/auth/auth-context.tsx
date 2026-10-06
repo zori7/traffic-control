@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
+import { disconnectRealtime } from '@/lib/realtime'
+
 import { fetchMe, loginRequest, logoutRequest, registerRequest } from './api'
 import type { Credentials, User } from './types'
 
@@ -40,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: logoutRequest,
     onSettled: () => {
+      disconnectRealtime()
       queryClient.setQueryData(ME_KEY, null)
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== 'auth',

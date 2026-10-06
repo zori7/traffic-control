@@ -149,6 +149,12 @@ class WorkerManager:
             self._workers.pop(worker.config.stream_id, None)
             self._tasks.pop(worker.config.stream_id, None)
             self._wake.pop(worker.config.stream_id, None)
+            # Tell subscribers the worker is gone (otherwise the last push they
+            # saw would keep the UI stuck on "running").
+            with contextlib.suppress(Exception):
+                from app.services.realtime import publish_status
+
+                await publish_status(worker.config.stream_id)
 
     async def _flush(self, worker: StreamWorker) -> None:
         events = worker.drain_events()

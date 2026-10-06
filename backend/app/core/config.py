@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     count_flush_seconds: float = 5.0
     media_token_expire_minutes: int = 360
 
+    # Realtime (Socket.IO)
+    realtime_push_seconds: float = 1.0
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

@@ -28,3 +28,18 @@ export function sourceHost(url: string): string {
     return url
   }
 }
+
+/** Compact uptime, e.g. "1h 04m", "12m 30s" or "8s". */
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`
+  if (minutes > 0) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
+  return `${seconds}s`
+}
+
+/** Relative time from a Unix timestamp in seconds (realtime feed). */
+export function formatRelativeFromSeconds(seconds: number): string {
+  return formatRelativeTime(new Date(seconds * 1000).toISOString())
+}

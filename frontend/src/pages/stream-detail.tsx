@@ -12,6 +12,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { AnimatedNumber } from '@/components/animated-number'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,13 +29,20 @@ import {
   stopStream,
 } from '@/features/streams/api'
 import { ConfirmDialog } from '@/features/streams/confirm-dialog'
+import { FpsSparkline } from '@/features/streams/fps-sparkline'
 import { HlsPlayer, type Resolution } from '@/features/streams/hls-player'
 import { OverlayEditor } from '@/features/streams/overlay-editor'
 import { StatusBadge } from '@/features/streams/status-badge'
 import { StreamFormDialog } from '@/features/streams/stream-form-dialog'
+import { useStreamRealtime } from '@/features/streams/use-stream-realtime'
 import type { Counters, StreamStatus, WorkerStatus } from '@/features/streams/types'
 import { ApiError } from '@/lib/api'
-import { formatRelativeTime, sourceHost } from '@/lib/format'
+import {
+  formatDuration,
+  formatRelativeFromSeconds,
+  formatRelativeTime,
+  sourceHost,
+} from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const ACTIVE_STATES = new Set(['starting', 'running', 'stopping'])
@@ -52,6 +60,9 @@ export function StreamDetailPage() {
   const [resolution, setResolution] = useState<Resolution | null>(null)
   const [view, setView] = useState<'source' | 'annotated'>('source')
 
+  // Live channel: pushes status + counters into the query cache while connected.
+  const { connected, fpsHistory, feed } = useStreamRealtime(streamId, validId)
+
   const streamQuery = useQuery({
     queryKey: ['streams', streamId],
     queryFn: () => fetchStream(streamId),
@@ -67,10 +78,12 @@ export function StreamDetailPage() {
     queryFn: () => fetchStatus(streamId),
     enabled: validId,
     refetchInterval: (query) => {
+      if (connected) return false
       const state = query.state.data?.state
       return state && ACTIVE_STATES.has(state) ? 1500 : 4000
     },
   })
+  const liveState = statusQuery.data?.state ?? streamQuery.data?.status ?? 'idle'
   const playbackQuery = useQuery({
     queryKey: ['streams', streamId, 'playback'],
     queryFn: () => fetchPlayback(streamId),
@@ -81,7 +94,8 @@ export function StreamDetailPage() {
     queryKey: ['streams', streamId, 'counts'],
     queryFn: () => fetchCounts(streamId),
     enabled: validId,
-    refetchInterval: (query) => (query.state.data?.total ? 3000 : 5000),
+    refetchInterval: () =>
+      connected && ACTIVE_STATES.has(liveState) ? false : liveState === 'running' ? 3000 : 5000,
   })
 
   const deleteMutation = useMutation({
@@ -137,7 +151,6 @@ export function StreamDetailPage() {
 
   // The view follows the worker: annotated once its HLS output exists, source
   // otherwise. A manual toggle while running sticks until the state changes.
-  const liveState = statusQuery.data?.state ?? streamQuery.data?.status ?? 'idle'
   const hlsReady = statusQuery.data?.hls_ready ?? false
   const autoView: 'source' | 'annotated' =
     liveState === 'running' && hlsReady ? 'annotated' : 'source'
@@ -180,6 +193,7 @@ export function StreamDetailPage() {
   const isActive = ACTIVE_STATES.has(state)
   const canToggleView = state === 'running'
   const counters: Counters | undefined = isActive ? status?.counters : countsQuery.data
+  const latest = feed[0]
   const playerSrc =
     isActive && hlsReady && view === 'annotated' && playbackQuery.data
       ? playbackQuery.data.manifest_url
@@ -300,11 +314,16 @@ export function StreamDetailPage() {
 
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Status</CardTitle>
-              <CardDescription>
-                {isActive ? 'Live worker telemetry.' : 'Start counting to see worker telemetry.'}
-              </CardDescription>
+            <CardHeader className="flex-row items-start justify-between gap-3">
+              <div>
+                <CardTitle>Status</CardTitle>
+                <CardDescription>
+                  {isActive
+                    ? 'Live worker telemetry.'
+                    : 'Start counting to see worker telemetry.'}
+                </CardDescription>
+              </div>
+              <LiveIndicator connected={connected} active={isActive} />
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
               <StatusRow label="State">
@@ -320,6 +339,11 @@ export function StreamDetailPage() {
               <StatusRow label="Frame rate">
                 {status && status.fps > 0 ? `${status.fps.toFixed(1)} fps` : '—'}
               </StatusRow>
+              {fpsHistory.length > 1 && (
+                <div className="rounded-lg border border-hairline bg-canvas-soft px-2 py-1.5">
+                  <FpsSparkline samples={fpsHistory} />
+                </div>
+              )}
               <StatusRow label="Frames processed">
                 {status && status.frames > 0 ? status.frames.toLocaleString() : '—'}
               </StatusRow>
@@ -328,6 +352,9 @@ export function StreamDetailPage() {
               </StatusRow>
               <StatusRow label="Dropped">
                 {status ? status.drop_count.toLocaleString() : '—'}
+              </StatusRow>
+              <StatusRow label="Uptime">
+                {status && status.uptime_s > 0 ? formatDuration(status.uptime_s) : '—'}
               </StatusRow>
             </CardContent>
           </Card>
@@ -346,22 +373,57 @@ export function StreamDetailPage() {
                 <>
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm text-muted">Total</span>
-                    <span className="font-display text-3xl font-light text-ink">
-                      {counters.total.toLocaleString()}
-                    </span>
+                    <AnimatedNumber
+                      value={counters.total}
+                      className="font-display text-3xl font-light text-ink"
+                    />
                   </div>
                   <ul className="space-y-2 border-t border-hairline pt-3">
                     {counters.lines.map((line) => (
                       <li key={line.line_id} className="flex items-center gap-3 text-sm">
                         <span
-                          className="h-3 w-3 shrink-0 rounded-full"
+                          key={latest?.line_id === line.line_id ? latest.ts : undefined}
+                          className={cn(
+                            'h-3 w-3 shrink-0 rounded-full',
+                            latest?.line_id === line.line_id && 'animate-count-pop',
+                          )}
                           style={{ backgroundColor: line.color }}
                         />
                         <span className="min-w-0 flex-1 truncate text-body">{line.name}</span>
-                        <span className="font-medium text-ink">{line.total.toLocaleString()}</span>
+                        <AnimatedNumber
+                          value={line.total}
+                          className="font-medium text-ink"
+                        />
                       </li>
                     ))}
                   </ul>
+                  {feed.length > 0 && (
+                    <div className="border-t border-hairline pt-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                        Latest
+                      </p>
+                      <ul className="mt-2 space-y-1.5">
+                        {feed.slice(0, 5).map((entry) => (
+                          <li
+                            key={`${entry.track_id}-${entry.ts}`}
+                            className="flex items-center gap-2 text-xs text-body"
+                          >
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="truncate">
+                              {entry.class_name}
+                              {entry.name ? ` · ${entry.name}` : ''}
+                            </span>
+                            <span className="ml-auto shrink-0 text-muted">
+                              {formatRelativeFromSeconds(entry.ts)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>
@@ -465,6 +527,26 @@ export function StreamDetailPage() {
         isPending={deleteMutation.isPending}
       />
     </div>
+  )
+}
+
+function LiveIndicator({ connected, active }: { connected: boolean; active: boolean }) {
+  if (connected && active) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+        </span>
+        Live
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+      <span className={cn('h-1.5 w-1.5 rounded-full', connected ? 'bg-success/60' : 'bg-muted')} />
+      {connected ? 'Realtime' : 'Polling'}
+    </span>
   )
 }
 

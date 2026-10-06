@@ -2,18 +2,22 @@
 
 from contextlib import asynccontextmanager
 
+import socketio
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth, health, lines, media, runtime, streams
 from app.core.config import settings
+from app.services import realtime
 from app.services.counting.manager import manager
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings.media_path.mkdir(parents=True, exist_ok=True)
+    await realtime.start()
     yield
+    await realtime.stop()
     await manager.stop_all()
 
 
@@ -46,3 +50,8 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+# Socket.IO wraps the FastAPI app: `/socket.io` is handled by the realtime
+# server, every other path (including the lifespan) is forwarded unchanged.
+# Run with: uvicorn app.main:socket_app
+socket_app = socketio.ASGIApp(realtime.sio, other_asgi_app=app, socketio_path="socket.io")

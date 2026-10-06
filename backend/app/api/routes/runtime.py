@@ -23,6 +23,7 @@ from app.schemas.runtime import (
     SessionOut,
     WorkerStatusOut,
 )
+from app.services import realtime
 from app.services.counting.manager import (
     AlreadyRunningError,
     CapacityError,
@@ -131,6 +132,7 @@ async def start_stream(stream_id: int, current_user: CurrentUser, db: DBSession)
         ) from exc
 
     await db.refresh(stream)
+    await realtime.publish_status(stream.id)
     return await _status_for(stream, db)
 
 
@@ -139,6 +141,7 @@ async def stop_stream(stream_id: int, current_user: CurrentUser, db: DBSession) 
     stream = await get_owned_stream(stream_id, current_user, db)
     await manager.stop(stream.id)
     await db.refresh(stream)
+    await realtime.publish_status(stream.id)
     return await _status_for(stream, db)
 
 

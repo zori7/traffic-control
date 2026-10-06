@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -129,6 +130,9 @@ class StreamWorker:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._events: list[Entry] = []
+        # A second, non-draining view of counted entries for the realtime feed.
+        self._recent: deque[tuple[int, Entry]] = deque(maxlen=200)
+        self._event_seq = 0
         self._snapshot: bytes | None = None
         self._counter: LaneCounter | None = None
         self._detector: Detector | None = None
@@ -181,6 +185,15 @@ class StreamWorker:
         with self._lock:
             events, self._events = self._events, []
             return events
+
+    def recent_entries(self) -> list[tuple[int, Entry]]:
+        """Counted entries with a monotonic sequence, for the realtime feed.
+
+        Unlike :meth:`drain_events` this does not consume anything, so the
+        persistence loop and the broadcaster can read independently.
+        """
+        with self._lock:
+            return list(self._recent)
 
     def snapshot_bytes(self) -> bytes | None:
         with self._lock:
@@ -344,6 +357,9 @@ class StreamWorker:
                 self.latency_ms = self.latency_ms * 0.8 + elapsed_ms * 0.2
                 if entries:
                     self._events.extend(entries)
+                    for entry in entries:
+                        self._event_seq += 1
+                        self._recent.append((self._event_seq, entry))
             window_frames += 1
 
             if now - window_start >= 1.0:
