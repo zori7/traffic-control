@@ -23,6 +23,9 @@
     --success: #16a34a;
     --error: #dc2626;
     --ring: #292524;
+    /* Data-viz accent — the brand's pastel gradient, deepened for light bg */
+    --chart-from: #5cc4a8;
+    --chart-to: #7aa9d8;
     color-scheme: light;
   }
 
@@ -46,6 +49,9 @@
     --success: #22c55e;
     --error: #f87171;
     --ring: #a8a29e;
+    /* Data-viz accent — the brand's pastels glow against the dark canvas */
+    --chart-from: #a7e5d3;
+    --chart-to: #a8c8e8;
     color-scheme: dark;
   }
 
