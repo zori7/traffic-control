@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
 
+import { onAuthExpired } from '@/lib/api'
 import { disconnectRealtime } from '@/lib/realtime'
 
 import { fetchMe, loginRequest, logoutRequest, registerRequest } from './api'
@@ -28,6 +29,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
     staleTime: 60_000,
   })
+
+  // If a token refresh is rejected, the session is over: drop cached data so
+  // the route guards send the user back to the login screen.
+  useEffect(
+    () =>
+      onAuthExpired(() => {
+        queryClient.setQueryData(ME_KEY, null)
+        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth' })
+      }),
+    [queryClient],
+  )
 
   const loginMutation = useMutation({
     mutationFn: loginRequest,

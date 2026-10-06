@@ -168,6 +168,11 @@ normalized to lowercase and hashed with Argon2. Streams are scoped to their
 owner; a line is an ordered polyline of normalized `{x, y}` points whose first
 point is the entry end.
 
+The web client refreshes an expired access token automatically: a `401`
+triggers one refresh-and-retry (concurrent `401`s share a single refresh, since
+the refresh token rotates on every call) and reconnects the Socket.IO session
+once a new access token is issued.
+
 The counting worker reads the source with ffmpeg, runs YOLO11-n + ByteTrack on
 CPU, applies the ROI and each lane corridor, counts a track once when it first
 travels forward past the line's entry gate, burns the overlays in with OpenCV,

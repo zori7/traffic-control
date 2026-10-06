@@ -1,5 +1,7 @@
 import { io, type Socket } from 'socket.io-client'
 
+import { onAuthRefreshed } from './api'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 /**
@@ -29,3 +31,9 @@ export function disconnectRealtime(): void {
   socket?.disconnect()
   socket = null
 }
+
+// A refused handshake (expired token) does not auto-retry, so nudge the socket
+// to reconnect once a fresh access token has been issued.
+onAuthRefreshed(() => {
+  if (socket && !socket.connected) socket.connect()
+})

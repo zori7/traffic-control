@@ -1,5 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
+const REFRESH_PATH = '/auth/refresh'
+
+// Requests that must never trigger a refresh-and-retry: the session endpoints
+// themselves.
+const NO_REFRESH_PATHS = new Set([REFRESH_PATH, '/auth/login', '/auth/register'])
+
 export class ApiError extends Error {
   status: number
   details?: unknown
@@ -28,11 +34,59 @@ function extractMessage(payload: unknown, fallback: string): string {
   return fallback
 }
 
+type SessionListener = () => void
+
+const refreshedListeners = new Set<SessionListener>()
+const expiredListeners = new Set<SessionListener>()
+
+/** Runs after the access token has been silently refreshed. */
+export function onAuthRefreshed(listener: SessionListener): () => void {
+  refreshedListeners.add(listener)
+  return () => refreshedListeners.delete(listener)
+}
+
+/** Runs when a refresh attempt is rejected — the session is over. */
+export function onAuthExpired(listener: SessionListener): () => void {
+  expiredListeners.add(listener)
+  return () => expiredListeners.delete(listener)
+}
+
+let refreshInFlight: Promise<boolean> | null = null
+
 /**
- * Thin fetch wrapper. Always sends cookies, normalises errors into ApiError,
- * and treats 204 as an empty body.
+ * Rotate the session using the HttpOnly refresh cookie. Concurrent 401s share
+ * a single in-flight refresh, which matters because the backend rotates the
+ * refresh token on every call (a second, parallel refresh would use a stale
+ * token and fail).
  */
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+function refreshSession(): Promise<boolean> {
+  refreshInFlight ??= doRefresh().finally(() => {
+    refreshInFlight = null
+  })
+  return refreshInFlight
+}
+
+async function doRefresh(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE}${REFRESH_PATH}`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (response.ok) {
+      refreshedListeners.forEach((listener) => listener())
+      return true
+    }
+    // A rejected refresh means the session is gone; a network error does not.
+    if (response.status === 401 || response.status === 403) {
+      expiredListeners.forEach((listener) => listener())
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+async function send<T>(path: string, options: RequestInit, allowRefresh: boolean): Promise<T> {
   const headers = new Headers(options.headers)
   if (options.body != null && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -43,6 +97,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     ...options,
     headers,
   })
+
+  if (response.status === 401 && allowRefresh && !NO_REFRESH_PATHS.has(path)) {
+    if (await refreshSession()) return send<T>(path, options, false)
+  }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     if (!response.ok) throw new ApiError(response.status, response.statusText)
@@ -57,4 +115,13 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   return payload as T
+}
+
+/**
+ * Thin fetch wrapper. Always sends cookies, refreshes an expired access token
+ * once and retries, normalises errors into ApiError, and treats 204 as an
+ * empty body.
+ */
+export function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return send<T>(path, options, true)
 }
