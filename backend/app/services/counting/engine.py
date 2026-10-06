@@ -17,8 +17,17 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import cv2
 import numpy as np
+
+try:  # pragma: no cover - guards an environment/setup problem
+    import cv2
+except ImportError as exc:
+    raise ImportError(
+        "Could not import OpenCV. On a headless host the GUI build "
+        "(opencv-python) fails to load system libraries; install the headless "
+        "build instead:\n"
+        "  pip uninstall -y opencv-python && pip install opencv-python-headless"
+    ) from exc
 
 from app.core.config import settings
 from app.services.counting.annotate import annotate

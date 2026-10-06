@@ -63,7 +63,9 @@ python3 -m venv .venv
 # PyTorch CPU wheels (the counting engine runs on CPU):
 .venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
 .venv/bin/pip install -r backend/requirements-dev.txt
-# On headless servers, swap OpenCV's GUI build (Ultralytics pulls it in):
+# Swap OpenCV's GUI build for the headless one (Ultralytics pulls in the GUI
+# build, which needs GLib/GTK that headless hosts lack). Re-run this after any
+# `pip install` that reintroduces opencv-python.
 .venv/bin/pip uninstall -y opencv-python && .venv/bin/pip install opencv-python-headless
 
 cp backend/.env.example backend/.env
