@@ -11,8 +11,11 @@ python-multipart>=0.0.9,<1
 python-socketio>=5.11,<6
 
 # Computer vision / counting engine (CPU). Install PyTorch from the CPU index:
-#   pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-# On headless servers, replace OpenCV's GUI build afterwards:
-#   pip uninstall -y opencv-python && pip install opencv-python-headless
+#   uv pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+# Ultralytics/Supervision declare the GUI OpenCV build, which needs GLib/GTK
+# that headless hosts lack. backend/overrides.txt removes it so the headless
+# build below is the only cv2; install with:
+#   uv pip install -r backend/requirements-dev.txt --overrides backend/overrides.txt
 ultralytics>=8.3,<9
 supervision>=0.24,<1
+opencv-python-headless>=4.10,<5

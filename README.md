@@ -61,12 +61,11 @@ All Python work uses the project-local `.venv`; run Python tools from `backend/`
 ```bash
 python3 -m venv .venv
 # PyTorch CPU wheels (the counting engine runs on CPU):
-.venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-.venv/bin/pip install -r backend/requirements-dev.txt
-# Swap OpenCV's GUI build for the headless one (Ultralytics pulls in the GUI
-# build, which needs GLib/GTK that headless hosts lack). Re-run this after any
-# `pip install` that reintroduces opencv-python.
-.venv/bin/pip uninstall -y opencv-python && .venv/bin/pip install opencv-python-headless
+uv pip install --python .venv --index-url https://download.pytorch.org/whl/cpu torch torchvision
+# uv resolves the deps and applies backend/overrides.txt, which drops the GUI
+# OpenCV build that Ultralytics pulls in (it needs GLib/GTK that headless hosts
+# lack), leaving the headless build as the only cv2.
+uv pip install --python .venv -r backend/requirements-dev.txt --overrides backend/overrides.txt
 
 cp backend/.env.example backend/.env
 # then set SECRET_KEY: .venv/bin/python -c "import secrets; print(secrets.token_urlsafe(48))"

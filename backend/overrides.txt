@@ -1,0 +1,9 @@
+# uv / pip-tools requirement overrides (see backend/requirements.txt).
+#
+# Ultralytics and Supervision declare the GUI OpenCV build (opencv-python),
+# which needs GLib/GTK that headless hosts lack. A never-true marker removes it
+# from the resolution, leaving opencv-python-headless (pinned in
+# requirements.txt) as the only cv2. Install with:
+#
+#   uv pip install -r backend/requirements-dev.txt --overrides backend/overrides.txt
+opencv-python; sys_platform == 'never'
