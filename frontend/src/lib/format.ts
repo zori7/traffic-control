@@ -43,3 +43,24 @@ export function formatDuration(totalSeconds: number): string {
 export function formatRelativeFromSeconds(seconds: number): string {
   return formatRelativeTime(new Date(seconds * 1000).toISOString())
 }
+
+/** Clock time for a bucket, e.g. "20:41". */
+export function formatClock(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+/** Full date and time, e.g. "6 Oct 2026, 20:41". */
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('en', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}

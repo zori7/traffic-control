@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
+  BarChart3,
   Pencil,
   Play,
   Square,
@@ -240,6 +241,12 @@ export function StreamDetailPage() {
               Start counting
             </Button>
           )}
+          <Button variant="outline" asChild>
+            <Link to={`/streams/${streamId}/analytics`}>
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" />
             Edit

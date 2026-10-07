@@ -128,6 +128,39 @@ export interface LiveEntry {
   ts: number
 }
 
+export type ExportDataset = 'counts' | 'events'
+export type ExportFormat = 'csv' | 'json'
+
+export interface AnalyticsClassCount {
+  class_name: string
+  count: number
+}
+
+export interface AnalyticsLineBreakdown {
+  line_id: number
+  name: string
+  color: string
+  total: number
+  classes: Record<string, number>
+}
+
+export interface AnalyticsSeriesPoint {
+  bucket_start: string
+  total: number
+  classes: Record<string, number>
+}
+
+export interface StreamAnalytics {
+  stream_id: number
+  session_id: number | null
+  started_at: string | null
+  ended_at: string | null
+  total: number
+  by_class: AnalyticsClassCount[]
+  by_line: AnalyticsLineBreakdown[]
+  series: AnalyticsSeriesPoint[]
+}
+
 export const VEHICLE_CLASSES = [
   { value: 'car', label: 'Car' },
   { value: 'truck', label: 'Truck' },

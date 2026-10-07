@@ -87,20 +87,7 @@ async function doRefresh(): Promise<boolean> {
 }
 
 async function send<T>(path: string, options: RequestInit, allowRefresh: boolean): Promise<T> {
-  const headers = new Headers(options.headers)
-  if (options.body != null && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json')
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers,
-  })
-
-  if (response.status === 401 && allowRefresh && !NO_REFRESH_PATHS.has(path)) {
-    if (await refreshSession()) return send<T>(path, options, false)
-  }
+  const response = await request(path, options, allowRefresh)
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     if (!response.ok) throw new ApiError(response.status, response.statusText)
@@ -115,6 +102,58 @@ async function send<T>(path: string, options: RequestInit, allowRefresh: boolean
   }
 
   return payload as T
+}
+
+/** Fetch with credentials, refreshing an expired token once (shared by send/file). */
+async function request(
+  path: string,
+  options: RequestInit,
+  allowRefresh: boolean,
+): Promise<Response> {
+  const headers = new Headers(options.headers)
+  if (options.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    ...options,
+    headers,
+  })
+
+  if (response.status === 401 && allowRefresh && !NO_REFRESH_PATHS.has(path)) {
+    if (await refreshSession()) return request(path, options, false)
+  }
+
+  return response
+}
+
+/** Extract the filename from a Content-Disposition header, if present. */
+function filenameFromDisposition(value: string | null): string | null {
+  if (!value) return null
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(value)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+/**
+ * Like apiFetch, but for file downloads: returns the raw response as a Blob
+ * together with the server-suggested filename. Errors are still normalised
+ * into ApiError.
+ */
+export async function apiFetchFile(
+  path: string,
+  options: RequestInit = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await request(path, options, true)
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('application/json')
+    const payload = isJson ? await response.json() : await response.text()
+    throw new ApiError(response.status, extractMessage(payload, response.statusText), payload)
+  }
+  return {
+    blob: await response.blob(),
+    filename: filenameFromDisposition(response.headers.get('content-disposition')),
+  }
 }
 
 /**

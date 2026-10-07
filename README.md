@@ -185,6 +185,9 @@ Frontend (`frontend/.env`, see `frontend/.env.example`): `VITE_PROXY_TARGET`,
 | GET | `/api/streams/{id}/counts` | Counters (live, or the latest session's totals) |
 | GET | `/api/streams/{id}/sessions` | Recent counting sessions |
 | GET | `/api/streams/{id}/events` | Recent line-entry events |
+| GET | `/api/streams/{id}/analytics` | Aggregated counts by line, class and minute (latest or `session_id`) |
+| GET | `/api/streams/{id}/export/counts` | Download per-minute counts (`format=csv\|json`, optional `session_id`) |
+| GET | `/api/streams/{id}/export/events` | Download individual crossings (`format=csv\|json`, optional `session_id`) |
 | GET | `/api/streams/{id}/playback` | Signed annotated-HLS manifest URL |
 | GET | `/api/streams/{id}/snapshot` | Latest annotated frame (JPEG) |
 | GET | `/api/streams/{id}/frame` | One still frame of the source (JPEG) |

@@ -6,7 +6,7 @@ import socketio
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, health, lines, media, runtime, streams
+from app.api.routes import analytics, auth, health, lines, media, runtime, streams
 from app.core.config import settings
 from app.services import realtime
 from app.services.counting.manager import manager
@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     api.include_router(streams.router)
     api.include_router(lines.router)
     api.include_router(runtime.router)
+    api.include_router(analytics.router)
     app.include_router(api)
     app.include_router(media.router)
 

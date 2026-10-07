@@ -1,13 +1,16 @@
-import { apiFetch } from '@/lib/api'
+import { apiFetch, apiFetchFile } from '@/lib/api'
 
 import type {
   CountingLine,
   CountingSession,
   Counters,
+  ExportDataset,
+  ExportFormat,
   LineEvent,
   LineInput,
   Playback,
   Stream,
+  StreamAnalytics,
   StreamInput,
   WorkerStatus,
 } from './types'
@@ -93,6 +96,24 @@ export function fetchSessions(streamId: number): Promise<CountingSession[]> {
 
 export function fetchEvents(streamId: number, limit = 50): Promise<LineEvent[]> {
   return apiFetch<LineEvent[]>(`/streams/${streamId}/events?limit=${limit}`)
+}
+
+/** Aggregate analytics for a stream, defaulting to its latest session. */
+export function fetchAnalytics(streamId: number, sessionId?: number): Promise<StreamAnalytics> {
+  const query = sessionId ? `?session_id=${sessionId}` : ''
+  return apiFetch<StreamAnalytics>(`/streams/${streamId}/analytics${query}`)
+}
+
+/** Download a counts/events export as a Blob plus the server-suggested filename. */
+export function fetchExport(
+  streamId: number,
+  dataset: ExportDataset,
+  format: ExportFormat,
+  sessionId?: number,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const params = new URLSearchParams({ format })
+  if (sessionId) params.set('session_id', String(sessionId))
+  return apiFetchFile(`/streams/${streamId}/export/${dataset}?${params.toString()}`)
 }
 
 /** A single JPEG still of the source, used as the overlay editor background. */
