@@ -4,10 +4,10 @@ AI-powered traffic counting from video streams. Draw one or more directional
 lane lines over a live feed and Traffic Control counts the vehicles that enter
 each line from its entry end — in real time, split by class.
 
-> **Status:** Milestones 1–4 complete — foundation, design system, authentication,
+> **Status:** Milestones 1–5 complete — foundation, design system, authentication,
 > stream management, the CV counting engine with a Konva overlay editor and
-> annotated HLS output, and realtime counters/status over Socket.IO. Milestone 5
-> (hardening, analytics, deploy) is in progress: Docker deployment is ready. See
+> annotated HLS output, realtime counters/status over Socket.IO, stream analytics
+> and CSV/JSON export, Docker deployment, and a backend test suite. See
 > [Roadmap](#roadmap).
 
 ## Stack
@@ -235,10 +235,15 @@ if the connection drops it falls back to the REST endpoints.
 ```bash
 # backend
 cd backend && ../.venv/bin/ruff check . && ../.venv/bin/ruff format --check .
+cd backend && ../.venv/bin/python -m pytest
 
 # frontend
 cd frontend && npm run build && npm run lint
 ```
+
+The backend suite runs against a throwaway Postgres database derived from
+`DATABASE_URL` by appending `_test` (override with `TEST_DATABASE_URL`). It is
+created on demand and every test rolls back, so it never touches real data.
 
 ## Design system
 
@@ -257,4 +262,4 @@ Display type uses **Newsreader**; body copy uses **Inter**.
 | **M2 — Stream CRUD & detail shell** | Stream CRUD, list/detail pages, HLS source preview | Done |
 | **M3 — CV counting engine + overlay** | ffmpeg decode, YOLO11 + ByteTrack, ROI, directional lines, annotated HLS, Konva editor | Done |
 | **M4 — Realtime counters & status** | Socket.IO live counters, FPS/status panel, animations | Done |
-| **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | In progress |
+| **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | Done |
