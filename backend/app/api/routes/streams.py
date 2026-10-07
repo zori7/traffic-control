@@ -161,4 +161,9 @@ async def reorder_lines(
     for index, line_id in enumerate(payload.line_ids):
         by_id[line_id].order_index = index
     await db.commit()
-    return [by_id[line_id] for line_id in payload.line_ids]
+
+    # Refresh so the server-generated updated_at is loaded before serialization.
+    lines = [by_id[line_id] for line_id in payload.line_ids]
+    for line in lines:
+        await db.refresh(line)
+    return lines
