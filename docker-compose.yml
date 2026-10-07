@@ -17,5 +17,49 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: ./backend
+    image: traffic-control-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://traffic:traffic@db:5432/traffic_control
+      # Override SECRET_KEY (e.g. in a root .env) for any real deployment.
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      # Set COOKIE_SECURE=true once the web app is served over HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      MAX_CONCURRENT_STREAMS: ${MAX_CONCURRENT_STREAMS:-2}
+      MEDIA_DIR: /app/media
+      YOLO_MODEL: /app/models/yolo11n.pt
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+    ports:
+      - "8000:8000"
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build:
+      context: ./frontend
+    image: traffic-control-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  media:

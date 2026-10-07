@@ -31,4 +31,7 @@ media/
 .idea/
 .vscode/
 
+# Browser-automation artifacts
+.playwright-mcp/
+
 DESIGN.md

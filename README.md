@@ -6,7 +6,8 @@ each line from its entry end — in real time, split by class.
 
 > **Status:** Milestones 1–4 complete — foundation, design system, authentication,
 > stream management, the CV counting engine with a Konva overlay editor and
-> annotated HLS output, and realtime counters/status over Socket.IO. See
+> annotated HLS output, and realtime counters/status over Socket.IO. Milestone 5
+> (hardening, analytics, deploy) is in progress: Docker deployment is ready. See
 > [Roadmap](#roadmap).
 
 ## Stack
@@ -34,15 +35,18 @@ each line from its entry end — in real time, split by class.
 │   ├── alembic/           # migrations
 │   ├── tests/             # pytest suite
 │   ├── requirements*.txt
+│   ├── Dockerfile         # API image: Python 3.13 + ffmpeg, YOLO weights baked in
 │   └── pyproject.toml     # ruff + pytest config
 ├── frontend/
+│   ├── Dockerfile         # web image: Vite build served by nginx
+│   ├── nginx.conf         # proxies /api, /media and /socket.io to the api
 │   └── src/
 │       ├── components/      # ui primitives, layout, theme, landing
 │       ├── features/auth/   # auth API, context, route guards
 │       ├── features/streams/# streams API, HLS player, dialogs, status, Konva overlay editor
 │       ├── lib/             # api client, query client, utils
 │       └── pages/           # landing, login, register, streams, stream detail, not-found
-├── docker-compose.yml     # PostgreSQL (api/web added in M5)
+├── docker-compose.yml     # PostgreSQL + api + web (docker compose up --build)
 ├── pyrightconfig.json
 └── DESIGN.md              # design tokens
 ```
@@ -101,6 +105,30 @@ cd backend && ../.venv/bin/uvicorn app.main:socket_app --reload --port 8010
 # frontend
 cd frontend && VITE_PROXY_TARGET=http://127.0.0.1:8010 npm run dev
 ```
+
+## Docker
+
+Run PostgreSQL, the API + counting engine and the web app as one stack:
+
+```bash
+cp .env.example .env   # then set SECRET_KEY
+docker compose up --build
+```
+
+Open `http://localhost:8080`; the API is also published on
+`http://localhost:8000` (docs at `/docs`). Migrations run automatically when the
+api container starts.
+
+- **api** (`backend/Dockerfile`) — Python 3.13 + ffmpeg, PyTorch CPU wheels and
+  the counting dependencies, with the GUI OpenCV build removed via
+  `backend/overrides.txt`. `yolo11n.pt` is baked in at build time, and annotated
+  HLS is written to the `media` volume.
+- **web** (`frontend/Dockerfile`) — a production Vite build served by nginx,
+  which proxies `/api`, `/media` and `/socket.io` to the api service so the
+  browser sees a single origin and HttpOnly cookies keep working.
+
+Set `SECRET_KEY` (required for any real deployment), `COOKIE_SECURE=true` behind
+HTTPS, and `CORS_ORIGINS` to the public origin in the root `.env`.
 
 ## Configuration
 
@@ -226,4 +254,4 @@ Display type uses **Newsreader**; body copy uses **Inter**.
 | **M2 — Stream CRUD & detail shell** | Stream CRUD, list/detail pages, HLS source preview | Done |
 | **M3 — CV counting engine + overlay** | ffmpeg decode, YOLO11 + ByteTrack, ROI, directional lines, annotated HLS, Konva editor | Done |
 | **M4 — Realtime counters & status** | Socket.IO live counters, FPS/status panel, animations | Done |
-| **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | Planned |
+| **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | In progress |

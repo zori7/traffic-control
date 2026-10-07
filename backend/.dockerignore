@@ -1,0 +1,14 @@
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+tests
+media
+# Secrets and weights never go into the build context; the image bakes the
+# detector weights itself and takes configuration from the environment.
+.env
+.env.*
+!.env.example
+*.pt
