@@ -10,6 +10,20 @@ each line from its entry end — in real time, split by class.
 > and CSV/JSON export, Docker deployment, and a backend test suite. See
 > [Roadmap](#roadmap).
 
+## Screenshots
+
+The landing page:
+
+![Traffic Control landing page](docs/landing.png)
+
+The overlay editor — draw directional lane lines and set the region of interest:
+
+![Overlay editor](docs/draw.png)
+
+Live worker status and per-line counters on a running stream:
+
+![Live counters and status](docs/counters.png)
+
 ## Stack
 
 | Layer | Technology |
