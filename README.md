@@ -263,3 +263,5 @@ Display type uses **Newsreader**; body copy uses **Inter**.
 | **M3 — CV counting engine + overlay** | ffmpeg decode, YOLO11 + ByteTrack, ROI, directional lines, annotated HLS, Konva editor | Done |
 | **M4 — Realtime counters & status** | Socket.IO live counters, FPS/status panel, animations | Done |
 | **M5 — Hardening, analytics, deploy** | Tests, analytics/export, Dockerfiles, compose for api + web | Done |
+| **M6 — Concurrency & scaling** | Shared model inference, GPU acceleration, Redis pub/sub for Socket.IO, media CDN offload | Planned
+
